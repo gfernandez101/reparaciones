@@ -85,6 +85,7 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
 .rec-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;letter-spacing:.3px;}
 .tag-green{background:rgba(39,174,96,.15);color:var(--green);}
+.tag-fact{background:rgba(39,174,96,.25);color:#2ECC71;border:1px solid rgba(39,174,96,.4);}
 .tag-yellow{background:rgba(243,156,18,.15);color:var(--yellow);}
 .tag-red{background:rgba(231,76,60,.15);color:var(--red);}
 .tag-blue{background:rgba(46,109,164,.15);color:var(--blue);}
@@ -285,6 +286,35 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
     <button class="btn btn-accent btn-full" style="padding:16px;font-size:16px;" onclick="saveRecord()">💾 GUARDAR REGISTRO</button>
     <button class="btn btn-gray btn-full" onclick="clearForm()">🔄 Limpiar formulario</button>
   </div>
+
+  <!-- RECAMBIOS -->
+  <div class="card">
+    <div class="card-title">🔩 Recambios utilizados</div>
+    <div style="display:grid;grid-template-columns:1fr 80px 44px;gap:8px;margin-bottom:8px;">
+      <div style="font-size:11px;color:var(--gray);font-weight:600;">REFERENCIA</div>
+      <div style="font-size:11px;color:var(--gray);font-weight:600;">CANT.</div>
+      <div></div>
+    </div>
+    <div id="recambiosList"></div>
+    <div style="display:grid;grid-template-columns:1fr 70px 44px 44px;gap:6px;margin-top:8px;" id="recambioInputRow">
+      <input type="text" id="rc_ref" placeholder="Referencia / nombre pieza"
+        style="background:var(--input);color:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:'Barlow',sans-serif;outline:none;"
+        onkeydown="if(event.key==='Enter')addRecambio()">
+      <input type="number" id="rc_qty" placeholder="1" min="1" value="1"
+        style="background:var(--input);color:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:10px 8px;font-size:14px;font-family:'Barlow',sans-serif;outline:none;text-align:center;"
+        onkeydown="if(event.key==='Enter')addRecambio()">
+      <button onclick="listenRecambio()"
+        style="background:var(--purple);border:none;border-radius:8px;color:#fff;font-size:18px;cursor:pointer;padding:0;" id="btnMicRc">🎤</button>
+      <button onclick="addRecambio()"
+        style="background:var(--green);border:none;border-radius:8px;color:#fff;font-size:20px;cursor:pointer;padding:0;">➕</button>
+    </div>
+    <div id="recambiosTotales" style="margin-top:10px;display:none;">
+      <div style="background:var(--input);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;">
+        <span style="font-size:12px;color:var(--gray);">Total piezas</span>
+        <span style="font-size:15px;font-weight:700;color:var(--accent);" id="rcTotalCount">0</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ TAB: HISTORIAL ═══ -->
@@ -292,6 +322,14 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
   <div class="search-box">
     <span>🔍</span>
     <input type="text" id="searchInput" placeholder="Buscar modelo, empresa, fecha..." oninput="renderList()">
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <button class="btn btn-sm" id="filtroTodos" onclick="setFiltro('todos')"
+      style="background:var(--accent);color:#fff;border:none;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">Todas</button>
+    <button class="btn btn-sm" id="filtroNoFact" onclick="setFiltro('nofact')"
+      style="background:var(--input);color:var(--light);border:1px solid var(--border);border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">Sin facturar</button>
+    <button class="btn btn-sm" id="filtroFact" onclick="setFiltro('fact')"
+      style="background:var(--input);color:var(--light);border:1px solid var(--border);border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">✅ Facturadas</button>
   </div>
   <div id="statsBar"></div>
   <div id="recList"></div>
@@ -588,6 +626,7 @@ function getForm(){
     hora_inicio:document.getElementById('displayHoraInicio').textContent,
     hora_fin:document.getElementById('displayHoraFin').textContent,
     tiempo_rep:getTimerHours(),
+    recambios: recambios.length ? JSON.parse(JSON.stringify(recambios)) : [],
     ts:Date.now()
   };
 }
@@ -608,10 +647,27 @@ function clearForm(){
   document.getElementById('f_tipo').selectedIndex=0;
   document.getElementById('f_estado').selectedIndex=0;
   document.getElementById('kmTotal').textContent='— km';
+  recambios=[];
+  renderRecambios();
   showToast('🔄 Formulario limpiado','info');
 }
 
 // ── HISTORIAL ──────────────────────────────────────────────────────────────
+let _filtro = 'todos';
+function setFiltro(f){
+  _filtro=f;
+  ['filtroTodos','filtroNoFact','filtroFact'].forEach(id=>{
+    document.getElementById(id).style.background='var(--input)';
+    document.getElementById(id).style.color='var(--light)';
+    document.getElementById(id).style.border='1px solid var(--border)';
+  });
+  const activeId = f==='todos'?'filtroTodos':f==='nofact'?'filtroNoFact':'filtroFact';
+  document.getElementById(activeId).style.background='var(--accent)';
+  document.getElementById(activeId).style.color='#fff';
+  document.getElementById(activeId).style.border='none';
+  renderList();
+}
+
 function stateClass(s){
   if(!s)return'tag-gray';
   if(s==='Completada')return'tag-green';
@@ -621,34 +677,40 @@ function stateClass(s){
 }
 function renderList(){
   const q=(document.getElementById('searchInput').value||'').toLowerCase();
-  const all=[...window._records].reverse();
-  const filtered=q?all.filter(r=>JSON.stringify(r).toLowerCase().includes(q)):all;
-  const totalH=filtered.reduce((a,r)=>a+parseFloat(r.tiempo_rep||0),0);
-  const totalKm=filtered.reduce((a,r)=>a+parseFloat(r.km||0),0);
+  let all=[...window._records].reverse();
+  if(q) all=all.filter(r=>JSON.stringify(r).toLowerCase().includes(q));
+  if(_filtro==='fact') all=all.filter(r=>r.facturada);
+  if(_filtro==='nofact') all=all.filter(r=>!r.facturada);
+  const totalH=all.reduce((a,r)=>a+parseFloat(r.tiempo_rep||0),0);
+  const totalKm=all.reduce((a,r)=>a+parseFloat(r.km||0),0);
   document.getElementById('statsBar').innerHTML=`
     <div class="stats-bar">
-      <div class="stat-item"><div class="sv">${filtered.length}</div><div class="sl">Registros</div></div>
+      <div class="stat-item"><div class="sv">${all.length}</div><div class="sl">Registros</div></div>
       <div class="stat-item"><div class="sv">${totalH.toFixed(1)}h</div><div class="sl">Horas</div></div>
       <div class="stat-item"><div class="sv">${Math.round(totalKm)}</div><div class="sl">KM</div></div>
     </div>`;
-  if(!filtered.length){
+  if(!all.length){
     document.getElementById('recList').innerHTML=`
       <div class="empty"><div class="ei">📋</div>
-      <p>No hay registros todavía.<br>Usa "Nueva" para añadir uno.</p></div>`;
+      <p>No hay registros.<br>Usa "Nueva" para añadir uno.</p></div>`;
     return;
   }
-  document.getElementById('recList').innerHTML=filtered.map(r=>`
+  document.getElementById('recList').innerHTML=all.map(r=>`
     <div class="rec-card" onclick="openDetail('${r._id}')">
       <div class="rec-top">
         <div><div class="rec-modelo">${r.modelo||'Sin modelo'}</div>
           <div class="rec-empresa">${r.empresa||''} ${r.persona?'· '+r.persona:''}</div>
         </div>
-        <div class="rec-fecha">${r.fecha||''}</div>
+        <div style="text-align:right;">
+          <div class="rec-fecha">${r.fecha||''}</div>
+          ${r.facturada?'<span class="tag tag-fact" style="margin-top:4px;display:inline-block;">✅ Facturada</span>':''}
+        </div>
       </div>
       <div class="rec-tags">
         <span class="tag ${stateClass(r.estado)}">${r.estado||'—'}</span>
         <span class="tag tag-gray">${r.tipo||'—'}</span>
         ${r.serie?`<span class="tag tag-blue">${r.serie}</span>`:''}
+        ${r.recambios&&r.recambios.length?`<span class="tag tag-blue">🔩 ${r.recambios.reduce((a,x)=>a+x.qty,0)} piezas</span>`:''}
       </div>
       <div class="rec-stats">
         <div class="rec-stat">⏱ <span>${r.tiempo_rep?r.tiempo_rep+'h':'—'}</span></div>
@@ -677,7 +739,22 @@ function openDetail(id){
         <div style="font-size:11px;color:var(--gray);margin-bottom:4px;">📝 DESCRIPCIÓN</div>
         <div style="font-size:14px;color:var(--light);line-height:1.5;">${r.descripcion}</div>
       </div>`:''}
+      ${r.recambios&&r.recambios.length?`<div style="background:var(--input);border-radius:8px;padding:12px;margin-top:4px;">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:8px;">🔩 RECAMBIOS (${r.recambios.reduce((a,x)=>a+x.qty,0)} piezas)</div>
+        ${r.recambios.map(x=>`
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;color:var(--light);">${x.ref}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--accent);">×${x.qty}</span>
+          </div>`).join('')}
+      </div>`:''}
     </div>`;
+  // Botón facturar
+  const factBtn = document.createElement('button');
+  factBtn.className = r.facturada ? 'btn btn-gray' : 'btn btn-green';
+  factBtn.style.cssText = 'width:100%;margin-top:10px;padding:12px;font-size:14px;';
+  factBtn.innerHTML = r.facturada ? '↩ Marcar como NO facturada' : '✅ Marcar como FACTURADA';
+  factBtn.onclick = () => toggleFacturada(r._id, r.facturada);
+  document.getElementById('modalDetalleContent').appendChild(factBtn);
   openModal('modalDetalle');
 }
 function row(l,v){
@@ -707,6 +784,8 @@ function loadRecord(){
   const estados=['Completada','En curso','Pendiente piezas','Revisión pendiente'];
   document.getElementById('f_tipo').selectedIndex=Math.max(0,tipos.indexOf(r.tipo));
   document.getElementById('f_estado').selectedIndex=Math.max(0,estados.indexOf(r.estado));
+  recambios = r.recambios ? JSON.parse(JSON.stringify(r.recambios)) : [];
+  renderRecambios();
   recalcKm();
   closeModal('modalDetalle');
   showTab('nueva');
@@ -803,7 +882,46 @@ function listenField(fieldId){
   r.onend=()=>{if(btn)btn.classList.remove('listening');}
   r.start();
 }
-function listenCommand(){
+async function toggleFacturada(id, current){
+  const r = window._records.find(x=>x._id===id);
+  if(!r) return;
+  r.facturada = !current;
+  await window.saveRecordDB({...r});
+  closeModal('modalDetalle');
+  showToast(r.facturada ? '✅ Marcada como facturada' : '↩ Desmarcada', 'info');
+  renderList();
+}
+
+function listenRecambio(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){showToast('Voz no disponible','error');return;}
+  const r=new SR();r.lang='es-ES';r.continuous=false;r.interimResults=false;
+  const btn=document.getElementById('btnMicRc');
+  btn.classList.add('listening'); btn.textContent='🔴';
+  r.onresult=e=>{
+    const text=e.results[0][0].transcript.trim();
+    // Intentar extraer cantidad si se dice "2 filtros" o "filtro 3"
+    const numMatch=text.match(/^(\d+)\s+(.+)$|^(.+?)\s+(\d+)$/);
+    if(numMatch){
+      if(numMatch[1]){
+        document.getElementById('rc_ref').value=numMatch[2];
+        document.getElementById('rc_qty').value=numMatch[1];
+      } else {
+        document.getElementById('rc_ref').value=numMatch[3];
+        document.getElementById('rc_qty').value=numMatch[4];
+      }
+    } else {
+      document.getElementById('rc_ref').value=text;
+    }
+    btn.classList.remove('listening'); btn.textContent='🎤';
+    showToast(`🎤 ${text}`,'info');
+    addRecambio();
+  };
+  r.onerror=()=>{btn.classList.remove('listening');btn.textContent='🎤';};
+  r.onend=()=>{btn.classList.remove('listening');btn.textContent='🎤';}
+  r.start();
+}
+
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){showToast('Voz no disponible','error');return;}
   const r=new SR();r.lang='es-ES';r.continuous=false;r.interimResults=false;
@@ -823,7 +941,51 @@ function listenCommand(){
   r.start();
 }
 
-// ── MODALES ────────────────────────────────────────────────────────────────
+// ── RECAMBIOS ──────────────────────────────────────────────────────────────
+let recambios = []; // [{ref, qty}]
+
+function addRecambio(){
+  const ref = document.getElementById('rc_ref').value.trim();
+  const qty = parseInt(document.getElementById('rc_qty').value)||1;
+  if(!ref){ showToast('Escribe una referencia','error'); return; }
+  // Si ya existe la referencia, sumar cantidad
+  const existing = recambios.find(r=>r.ref.toLowerCase()===ref.toLowerCase());
+  if(existing){ existing.qty += qty; }
+  else { recambios.push({ref, qty}); }
+  document.getElementById('rc_ref').value='';
+  document.getElementById('rc_qty').value='1';
+  document.getElementById('rc_ref').focus();
+  renderRecambios();
+}
+
+function removeRecambio(idx){
+  recambios.splice(idx,1);
+  renderRecambios();
+}
+
+function renderRecambios(){
+  const list = document.getElementById('recambiosList');
+  const totDiv = document.getElementById('recambiosTotales');
+  if(!recambios.length){
+    list.innerHTML='<div style="font-size:13px;color:var(--gray);padding:6px 0;">Sin recambios añadidos</div>';
+    totDiv.style.display='none';
+    return;
+  }
+  list.innerHTML = recambios.map((r,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 80px 44px;gap:8px;margin-bottom:6px;align-items:center;">
+      <div style="background:var(--input);border-radius:6px;padding:8px 12px;font-size:13px;color:var(--light);">${r.ref}</div>
+      <div style="background:var(--input);border-radius:6px;padding:8px;font-size:14px;font-weight:700;color:var(--accent);text-align:center;">${r.qty}</div>
+      <button onclick="removeRecambio(${i})"
+        style="background:var(--red);border:none;border-radius:6px;color:#fff;font-size:16px;cursor:pointer;padding:8px 0;width:100%;">✕</button>
+    </div>`).join('');
+  const total = recambios.reduce((a,r)=>a+r.qty,0);
+  document.getElementById('rcTotalCount').textContent = total;
+  totDiv.style.display='block';
+}
+
+// Inicializar lista vacía
+renderRecambios();
+
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(m=>{
@@ -842,4 +1004,3 @@ function showToast(msg,type=''){
 </script>
 </body>
 </html>
-

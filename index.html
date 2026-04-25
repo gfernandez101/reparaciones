@@ -402,8 +402,8 @@ onSnapshot(q, snapshot => {
   snapshot.forEach(d => window._records.push({_id: d.id, ...d.data()}));
   setSyncStatus('ok', '● Sincronizado');
   document.getElementById('loadingOverlay').classList.add('hidden');
-  if(window._activeTab === 'historial') renderList();
-  if(window._activeTab === 'resumen')   renderResumen();
+  if(window._activeTab === 'historial' && window.renderList) window.renderList();
+  if(window._activeTab === 'resumen'   && window.renderResumen) window.renderResumen();
 }, err => {
   setSyncStatus('err', '✕ Sin conexión');
   document.getElementById('loadingOverlay').classList.add('hidden');
@@ -922,24 +922,30 @@ function listenRecambio(){
   r.start();
 }
 
+function listenCommand(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){showToast('Voz no disponible','error');return;}
+  if(!SR){showToast('Voz no disponible en este navegador','error');return;}
   const r=new SR();r.lang='es-ES';r.continuous=false;r.interimResults=false;
   setVoiceStatus('🔴 Esperando comando...','var(--red)');
   r.onresult=e=>{
     const text=e.results[0][0].transcript.toLowerCase();
-    setVoiceStatus(`Comando: "${text}"`,'var(--light)');
+    setVoiceStatus('Comando: '+text,'var(--light)');
     if(/iniciar|empezar|start/.test(text)){if(!timerRunning)toggleTimer();}
     else if(/pausar|parar|stop|detener/.test(text)){if(timerRunning)toggleTimer();}
     else if(/guardar|save|grabar/.test(text)){setTimeout(saveRecord,300);}
     else if(/limpiar|nuevo|borrar/.test(text)){clearForm();}
     else if(/exportar|csv/.test(text)){exportCSV();}
     else if(/calcular|km/.test(text)){calcKm();}
-    else setVoiceStatus(`❓ No reconocido: "${text}"`,'var(--yellow)');
+    else setVoiceStatus('No reconocido: '+text,'var(--yellow)');
   };
   r.onerror=()=>setVoiceStatus('No se entendió','var(--yellow)');
+  r.onend=()=>{};
   r.start();
 }
+
+// expose for cross-script access
+window.renderList = renderList;
+window.renderResumen = renderResumen;
 
 // ── RECAMBIOS ──────────────────────────────────────────────────────────────
 let recambios = []; // [{ref, qty}]

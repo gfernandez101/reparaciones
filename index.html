@@ -77,6 +77,7 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
 .search-box input{flex:1;background:none;border:none;color:var(--white);font-size:15px;font-family:'Barlow',sans-serif;outline:none;}
 .rec-card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:8px;border:1px solid var(--border);cursor:pointer;transition:border-color .2s;position:relative;overflow:hidden;}
 .rec-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);}
+.rec-card.en-curso::before{background:var(--yellow);}
 .rec-card:active{border-color:var(--accent);}
 .rec-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
 .rec-modelo{font-weight:700;font-size:15px;color:var(--white);}
@@ -120,6 +121,23 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
 .loading-overlay.hidden{display:none;}
 .spinner{width:44px;height:44px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SESIONES ── */
+.sesiones-block{background:var(--input);border-radius:8px;padding:10px 12px;margin-top:10px;border:1px solid var(--border);}
+.sesiones-title{font-size:11px;color:var(--gray);font-weight:600;letter-spacing:.3px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.sesion-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+.sesion-row:last-child{border-bottom:none;}
+.sesion-fecha{font-size:12px;font-weight:700;color:var(--accent);min-width:80px;}
+.sesion-horas{font-size:13px;color:var(--light);flex:1;}
+.sesion-dur{font-size:12px;color:var(--yellow);font-weight:700;min-width:48px;text-align:right;}
+.sesion-del{background:none;border:none;color:var(--gray);font-size:14px;cursor:pointer;padding:0 4px;line-height:1;}
+.sesion-del:active{color:var(--red);}
+.sesiones-total{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.sesiones-total .st-lbl{font-size:11px;color:var(--gray);}
+.sesiones-total .st-val{font-size:15px;font-weight:700;color:var(--accent);}
+.btn-sesion{background:rgba(243,156,18,.15);border:1px solid rgba(243,156,18,.4);color:var(--yellow);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:4px;margin-top:8px;}
+.btn-sesion:active{transform:scale(.95);}
+.sesion-nota{font-size:11px;color:var(--gray);font-style:italic;}
 </style>
 </head>
 <body>
@@ -331,6 +349,8 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
       style="background:var(--input);color:var(--light);border:1px solid var(--border);border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">Sin facturar</button>
     <button class="btn btn-sm" id="filtroFact" onclick="setFiltro('fact')"
       style="background:var(--input);color:var(--light);border:1px solid var(--border);border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">✅ Facturadas</button>
+    <button class="btn btn-sm" id="filtroEnCurso" onclick="setFiltro('encurso')"
+      style="background:var(--input);color:var(--light);border:1px solid var(--border);border-radius:20px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;">🔄 En curso</button>
   </div>
   <div id="statsBar"></div>
   <div id="recList"></div>
@@ -371,6 +391,39 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
   </div>
 </div>
 
+<!-- ═══ MODAL NUEVA SESIÓN ═══ -->
+<div class="modal-overlay" id="modalSesion">
+  <div class="modal">
+    <div class="modal-title">🕐 Registrar sesión de trabajo
+      <button class="modal-close" onclick="closeModal('modalSesion')">✕</button>
+    </div>
+    <div style="background:var(--input);border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--gray);">REPARACIÓN</div>
+      <div style="font-size:14px;font-weight:700;color:var(--light);" id="sesionRepLabel">—</div>
+    </div>
+    <div class="field">
+      <label>📅 FECHA DE LA SESIÓN</label>
+      <input type="date" id="s_fecha">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>🕐 HORA INICIO</label>
+        <input type="time" id="s_inicio">
+      </div>
+      <div class="field">
+        <label>🕐 HORA FIN</label>
+        <input type="time" id="s_fin">
+      </div>
+    </div>
+    <div class="field">
+      <label>📝 NOTA (opcional)</label>
+      <input type="text" id="s_nota" placeholder="Trabajos realizados en esta sesión...">
+    </div>
+    <div id="sesionDurPreview" style="text-align:center;font-size:13px;color:var(--gray);margin-bottom:10px;"></div>
+    <button class="btn btn-yellow btn-full" onclick="guardarSesion()">💾 GUARDAR SESIÓN</button>
+  </div>
+</div>
+
 <!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
@@ -396,7 +449,6 @@ function setSyncStatus(status, msg){
   syncTxt.textContent = msg;
 }
 
-// ── ESCUCHAR REGISTROS EN TIEMPO REAL ──────────────────────────────────────
 const q = query(collection(db, 'reparaciones'), orderBy('ts','asc'));
 onSnapshot(q, snapshot => {
   window._records = [];
@@ -410,12 +462,10 @@ onSnapshot(q, snapshot => {
   document.getElementById('loadingOverlay').classList.add('hidden');
 });
 
-// ── ESCUCHAR RUTAS EN TIEMPO REAL ──────────────────────────────────────────
 onSnapshot(doc(db,'config','rutas'), snap => {
   window._routes = snap.exists() ? snap.data() : {};
 });
 
-// ── GUARDAR REGISTRO ───────────────────────────────────────────────────────
 window.saveRecordDB = async function(data){
   setSyncStatus('loading','Guardando...');
   try {
@@ -434,7 +484,6 @@ window.saveRecordDB = async function(data){
   }
 };
 
-// ── ELIMINAR ───────────────────────────────────────────────────────────────
 window.deleteRecordDB = async function(id){
   try {
     await deleteDoc(doc(db,'reparaciones',id));
@@ -442,7 +491,6 @@ window.deleteRecordDB = async function(id){
   } catch(e){ setSyncStatus('err','Error'); }
 };
 
-// ── GUARDAR RUTAS ──────────────────────────────────────────────────────────
 window.saveRoutesDB = async function(routes){
   try {
     await setDoc(doc(db,'config','rutas'), routes);
@@ -459,6 +507,7 @@ window._activeTab = 'nueva';
 let selectedId = null;
 let detailId   = null;
 let pendingRoute = null;
+let sesionRepId = null; // ID del registro al que se añade sesión
 
 // ── RELOJ ──────────────────────────────────────────────────────────────────
 function updateClock(){
@@ -653,19 +702,191 @@ function clearForm(){
   showToast('🔄 Formulario limpiado','info');
 }
 
+// ── SESIONES DE TRABAJO (reparaciones en curso) ────────────────────────────
+
+// Calcula duración en texto a partir de "HH:MM"-"HH:MM"
+function calcDuracion(inicio, fin){
+  const [hi,mi]=inicio.split(':').map(Number);
+  const [hf,mf]=fin.split(':').map(Number);
+  let totalMin = (hf*60+mf) - (hi*60+mi);
+  if(totalMin<=0) return null;
+  const h=Math.floor(totalMin/60), m=totalMin%60;
+  return h>0 ? `${h}h ${m>0?m+'min':''}` : `${m}min`;
+}
+
+// Abre el modal de nueva sesión
+function abrirModalSesion(repId, event){
+  if(event) event.stopPropagation();
+  sesionRepId = repId;
+  const r = window._records.find(x=>x._id===repId);
+  if(!r) return;
+  document.getElementById('sesionRepLabel').textContent = `${r.modelo||'Sin modelo'} · ${r.serie||''}`;
+  // Fecha por defecto: hoy
+  const hoy = new Date();
+  document.getElementById('s_fecha').value = hoy.toISOString().slice(0,10);
+  // Hora inicio: ahora
+  const hh = String(hoy.getHours()).padStart(2,'0');
+  const mm = String(hoy.getMinutes()).padStart(2,'0');
+  document.getElementById('s_inicio').value = `${hh}:${mm}`;
+  document.getElementById('s_fin').value = '';
+  document.getElementById('s_nota').value = '';
+  document.getElementById('sesionDurPreview').textContent = '';
+  openModal('modalSesion');
+}
+
+// Preview duración en tiempo real
+document.addEventListener('DOMContentLoaded',()=>{
+  ['s_inicio','s_fin'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', previewDuracion);
+  });
+});
+function previewDuracion(){
+  const ini = document.getElementById('s_inicio').value;
+  const fin = document.getElementById('s_fin').value;
+  const prev = document.getElementById('sesionDurPreview');
+  if(ini && fin){
+    const dur = calcDuracion(ini,fin);
+    prev.textContent = dur ? `⏱ Duración: ${dur}` : '⚠ La hora fin debe ser posterior al inicio';
+    prev.style.color = dur ? 'var(--yellow)' : 'var(--red)';
+  } else {
+    prev.textContent='';
+  }
+}
+
+// Guardar sesión en Firestore
+async function guardarSesion(){
+  const fecha = document.getElementById('s_fecha').value;
+  const inicio = document.getElementById('s_inicio').value;
+  const fin = document.getElementById('s_fin').value;
+  const nota = document.getElementById('s_nota').value.trim();
+  if(!fecha||!inicio||!fin){showToast('Fecha, inicio y fin son obligatorios','error');return;}
+  const dur = calcDuracion(inicio,fin);
+  if(!dur){showToast('La hora fin debe ser posterior al inicio','error');return;}
+
+  const r = window._records.find(x=>x._id===sesionRepId);
+  if(!r){showToast('Error: registro no encontrado','error');return;}
+
+  const sesiones = r.sesiones ? [...r.sesiones] : [];
+  sesiones.push({
+    id: Date.now().toString(),
+    fecha,
+    inicio,
+    fin,
+    duracion: dur,
+    nota
+  });
+  // Ordenar por fecha+inicio
+  sesiones.sort((a,b)=>(a.fecha+a.inicio)>(b.fecha+b.inicio)?1:-1);
+
+  // Recalcular tiempo total acumulado en horas (decimal)
+  let totalMin = sesiones.reduce((acc,s)=>{
+    const [hi,mi]=s.inicio.split(':').map(Number);
+    const [hf,mf]=s.fin.split(':').map(Number);
+    return acc + Math.max(0,(hf*60+mf)-(hi*60+mi));
+  },0);
+  const tiempoTotal = Math.round(totalMin/60*100)/100;
+
+  const updated = {...r, sesiones, tiempo_rep: tiempoTotal, _id: r._id};
+  const ok = await window.saveRecordDB(updated);
+  if(ok){
+    closeModal('modalSesion');
+    showToast(`✅ Sesión registrada · ${dur}`);
+    // Si el modal de detalle está abierto, refrescarlo
+    if(document.getElementById('modalDetalle').classList.contains('open')){
+      setTimeout(()=>openDetail(sesionRepId),400);
+    }
+  }
+}
+
+// Eliminar una sesión
+async function eliminarSesion(repId, sesionId, event){
+  if(event) event.stopPropagation();
+  if(!confirm('¿Eliminar esta sesión?')) return;
+  const r = window._records.find(x=>x._id===repId);
+  if(!r) return;
+  const sesiones = (r.sesiones||[]).filter(s=>s.id!==sesionId);
+  let totalMin = sesiones.reduce((acc,s)=>{
+    const [hi,mi]=s.inicio.split(':').map(Number);
+    const [hf,mf]=s.fin.split(':').map(Number);
+    return acc + Math.max(0,(hf*60+mf)-(hi*60+mi));
+  },0);
+  const tiempoTotal = Math.round(totalMin/60*100)/100;
+  const updated = {...r, sesiones, tiempo_rep: tiempoTotal, _id: r._id};
+  await window.saveRecordDB(updated);
+  showToast('🗑 Sesión eliminada','info');
+  if(document.getElementById('modalDetalle').classList.contains('open')){
+    setTimeout(()=>openDetail(repId),400);
+  }
+}
+
+// Renderiza el bloque de sesiones en el detalle o en la tarjeta
+function renderSesionesHTML(r, enDetalle=false){
+  const sesiones = r.sesiones||[];
+  if(!sesiones.length && !enDetalle) return '';
+  
+  let html = `<div class="sesiones-block">
+    <div class="sesiones-title">
+      <span>📅 SESIONES REGISTRADAS (${sesiones.length})</span>
+      ${enDetalle?`<button class="btn-sesion" onclick="abrirModalSesion('${r._id}',event)">➕ Nueva sesión</button>`:''}
+    </div>`;
+  
+  if(!sesiones.length){
+    html += `<div style="font-size:13px;color:var(--gray);padding:4px 0;">Sin sesiones aún. Pulsa "Nueva sesión" para registrar.</div>`;
+  } else {
+    // Agrupar por fecha para mostrar encabezado de día
+    let lastFecha='';
+    sesiones.forEach(s=>{
+      const fechaFmt = formatFecha(s.fecha);
+      if(s.fecha!==lastFecha){
+        if(lastFecha) html+=`<div style="height:4px;"></div>`;
+        html+=`<div style="font-size:11px;color:var(--accent);font-weight:700;padding:6px 0 2px;border-top:${lastFecha?'1px solid var(--border)':'none'};margin-top:${lastFecha?'4px':'0'};">${fechaFmt}</div>`;
+        lastFecha=s.fecha;
+      }
+      html+=`<div class="sesion-row">
+        <span class="sesion-horas">${s.inicio} → ${s.fin}</span>
+        <span class="sesion-dur">${s.duracion}</span>
+        ${s.nota?`<span class="sesion-nota" style="flex:1;margin-left:4px;">${s.nota}</span>`:''}
+        ${enDetalle?`<button class="sesion-del" onclick="eliminarSesion('${r._id}','${s.id}',event)" title="Eliminar sesión">✕</button>`:''}
+      </div>`;
+    });
+
+    // Total acumulado
+    let totalMin = sesiones.reduce((acc,s)=>{
+      const [hi,mi]=s.inicio.split(':').map(Number);
+      const [hf,mf]=s.fin.split(':').map(Number);
+      return acc + Math.max(0,(hf*60+mf)-(hi*60+mi));
+    },0);
+    const th=Math.floor(totalMin/60), tm=totalMin%60;
+    html+=`<div class="sesiones-total">
+      <span class="st-lbl">⏱ Tiempo total acumulado</span>
+      <span class="st-val">${th}h ${tm>0?tm+'min':''}</span>
+    </div>`;
+  }
+  html+='</div>';
+  return html;
+}
+
+function formatFecha(isoDate){
+  if(!isoDate) return '';
+  const [y,m,d] = isoDate.split('-');
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const fecha = new Date(parseInt(y),parseInt(m)-1,parseInt(d));
+  return `${dias[fecha.getDay()]} ${parseInt(d)} ${meses[parseInt(m)-1]} ${y}`;
+}
+
 // ── HISTORIAL ──────────────────────────────────────────────────────────────
 let _filtro = 'todos';
 function setFiltro(f){
   _filtro=f;
-  ['filtroTodos','filtroNoFact','filtroFact'].forEach(id=>{
-    document.getElementById(id).style.background='var(--input)';
-    document.getElementById(id).style.color='var(--light)';
-    document.getElementById(id).style.border='1px solid var(--border)';
+  const ids=['filtroTodos','filtroNoFact','filtroFact','filtroEnCurso'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.style.background='var(--input)';el.style.color='var(--light)';el.style.border='1px solid var(--border)';}
   });
-  const activeId = f==='todos'?'filtroTodos':f==='nofact'?'filtroNoFact':'filtroFact';
-  document.getElementById(activeId).style.background='var(--accent)';
-  document.getElementById(activeId).style.color='#fff';
-  document.getElementById(activeId).style.border='none';
+  const map={todos:'filtroTodos',nofact:'filtroNoFact',fact:'filtroFact',encurso:'filtroEnCurso'};
+  const activeEl=document.getElementById(map[f]);
+  if(activeEl){activeEl.style.background='var(--accent)';activeEl.style.color='#fff';activeEl.style.border='none';}
   renderList();
 }
 
@@ -676,12 +897,14 @@ function stateClass(s){
   if(s==='Pendiente piezas')return'tag-red';
   return'tag-blue';
 }
+
 function renderList(){
   const q=(document.getElementById('searchInput').value||'').toLowerCase();
   let all=[...window._records].reverse();
   if(q) all=all.filter(r=>JSON.stringify(r).toLowerCase().includes(q));
   if(_filtro==='fact') all=all.filter(r=>r.facturada);
   if(_filtro==='nofact') all=all.filter(r=>!r.facturada);
+  if(_filtro==='encurso') all=all.filter(r=>r.estado==='En curso');
   const totalH=all.reduce((a,r)=>a+parseFloat(r.tiempo_rep||0),0);
   const totalKm=all.reduce((a,r)=>a+parseFloat(r.km||0),0);
   document.getElementById('statsBar').innerHTML=`
@@ -696,8 +919,12 @@ function renderList(){
       <p>No hay registros.<br>Usa "Nueva" para añadir uno.</p></div>`;
     return;
   }
-  document.getElementById('recList').innerHTML=all.map(r=>`
-    <div class="rec-card" onclick="openDetail('${r._id}')">
+  document.getElementById('recList').innerHTML=all.map(r=>{
+    const enCurso = r.estado==='En curso';
+    const sesiones = r.sesiones||[];
+    const numSesiones = sesiones.length;
+    return `
+    <div class="rec-card ${enCurso?'en-curso':''}" onclick="openDetail('${r._id}')">
       <div class="rec-top">
         <div>
           <div class="rec-modelo">${r.modelo||'Sin modelo'}</div>
@@ -713,13 +940,16 @@ function renderList(){
         <span class="tag ${stateClass(r.estado)}">${r.estado||'—'}</span>
         <span class="tag tag-gray">${r.tipo||'—'}</span>
         ${r.recambios&&r.recambios.length?`<span class="tag tag-blue">🔩 ${r.recambios.reduce((a,x)=>a+x.qty,0)} piezas</span>`:''}
+        ${numSesiones>0?`<span class="tag tag-yellow">📅 ${numSesiones} sesión${numSesiones>1?'es':''}</span>`:''}
       </div>
       <div class="rec-stats">
         <div class="rec-stat">⏱ <span>${r.tiempo_rep?r.tiempo_rep+'h':'—'}</span></div>
         <div class="rec-stat">🗺 <span>${r.km?Math.round(r.km)+' km':'—'}</span></div>
         ${r.origen?`<div class="rec-stat">📍 <span>${r.origen}</span></div>`:''}
       </div>
-    </div>`).join('');
+      ${enCurso?`<button class="btn-sesion" onclick="abrirModalSesion('${r._id}',event)">➕ Registrar sesión de hoy</button>`:''}
+    </div>`;
+  }).join('');
 }
 
 // ── DETALLE ────────────────────────────────────────────────────────────────
@@ -727,11 +957,12 @@ function openDetail(id){
   detailId=id;
   const r=window._records.find(x=>x._id===id);
   if(!r)return;
+  const enCurso = r.estado==='En curso';
   document.getElementById('modalDetalleContent').innerHTML=`
     <div style="display:grid;gap:8px;">
       ${row('🔧 Modelo',r.modelo)}${row('🔢 Serie',r.serie)}
       ${row('🏢 Empresa',r.empresa)}${row('👤 Persona',r.persona)}
-      ${row('📅 Fecha',r.fecha)}${row('⏱ Tiempo',r.tiempo_rep?r.tiempo_rep+'h':'')}
+      ${row('📅 Fecha',r.fecha)}${row('⏱ Tiempo total',r.tiempo_rep?r.tiempo_rep+'h':'')}
       ${row('🕐 Inicio',r.hora_inicio)}${row('🕐 Fin',r.hora_fin)}
       ${row('📍 Origen',r.origen)}${row('📍 Destino',r.destino)}
       ${row('🗺 KM total',r.km?Math.round(r.km)+' km':'')}
@@ -749,7 +980,9 @@ function openDetail(id){
             <span style="font-size:13px;font-weight:700;color:var(--accent);">×${x.qty}</span>
           </div>`).join('')}
       </div>`:''}
+      ${renderSesionesHTML(r, true)}
     </div>`;
+
   // Botón facturar
   const factBtn = document.createElement('button');
   factBtn.className = r.facturada ? 'btn btn-gray' : 'btn btn-green';
@@ -757,8 +990,10 @@ function openDetail(id){
   factBtn.innerHTML = r.facturada ? '↩ Marcar como NO facturada' : '✅ Marcar como FACTURADA';
   factBtn.onclick = () => toggleFacturada(r._id, r.facturada);
   document.getElementById('modalDetalleContent').appendChild(factBtn);
+
   openModal('modalDetalle');
 }
+
 function row(l,v){
   if(!v)return'';
   return`<div style="display:flex;justify-content:space-between;align-items:center;
@@ -799,6 +1034,17 @@ async function deleteRecord(){
   showToast('🗑 Eliminado','info');
 }
 
+// ── FACTURADA ──────────────────────────────────────────────────────────────
+async function toggleFacturada(id, current){
+  const r = window._records.find(x=>x._id===id);
+  if(!r) return;
+  r.facturada = !current;
+  await window.saveRecordDB({...r});
+  closeModal('modalDetalle');
+  showToast(r.facturada ? '✅ Marcada como facturada' : '↩ Desmarcada', 'info');
+  renderList();
+}
+
 // ── RESUMEN ────────────────────────────────────────────────────────────────
 function renderResumen(){
   const recs=window._records;
@@ -808,11 +1054,29 @@ function renderResumen(){
   }
   const totalH=recs.reduce((a,r)=>a+parseFloat(r.tiempo_rep||0),0);
   const totalKm=recs.reduce((a,r)=>a+parseFloat(r.km||0),0);
+  const enCurso=recs.filter(r=>r.estado==='En curso');
   const estados={},tipos={};
   recs.forEach(r=>{
     const s=r.estado||'Sin estado'; estados[s]=(estados[s]||0)+1;
     const t=r.tipo||'Otro'; tipos[t]=(tipos[t]||0)+1;
   });
+  let enCursoHTML='';
+  if(enCurso.length){
+    enCursoHTML=`<div class="card"><div class="card-title">🔄 Reparaciones en curso (${enCurso.length})</div>
+      ${enCurso.map(r=>{
+        const sesiones=r.sesiones||[];
+        const numSes=sesiones.length;
+        return `<div style="background:var(--input);border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--white);">${r.modelo||'Sin modelo'}</div>
+            <div style="font-size:12px;color:var(--gray);">${r.empresa||''} · ${r.fecha||''}</div>
+            ${numSes>0?`<div style="font-size:11px;color:var(--yellow);margin-top:2px;">📅 ${numSes} sesión${numSes>1?'es':''} · ${r.tiempo_rep||0}h acum.</div>`:'<div style="font-size:11px;color:var(--gray);margin-top:2px;">Sin sesiones</div>'}
+          </div>
+          <button class="btn-sesion" onclick="showTab('historial');setTimeout(()=>abrirModalSesion('${r._id}',null),300)">➕ Sesión</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
   document.getElementById('resumenContent').innerHTML=`
     <div class="card"><div class="card-title">📊 Totales globales</div>
       <div class="stats-bar">
@@ -821,6 +1085,7 @@ function renderResumen(){
         <div class="stat-item"><div class="sv">${Math.round(totalKm)}</div><div class="sl">KM totales</div></div>
       </div>
     </div>
+    ${enCursoHTML}
     <div class="card"><div class="card-title">✅ Por estado</div>
       ${Object.entries(estados).map(([s,n])=>`
         <div style="display:flex;justify-content:space-between;align-items:center;
@@ -844,11 +1109,18 @@ function exportCSV(){
   const recs=window._records;
   if(!recs.length){showToast('No hay datos','error');return;}
   const heads=['Fecha','Modelo','Serie','Empresa','Persona','Origen','Destino',
-    'KM','H.Máquina','H.Inicio','H.Fin','T.Reparación(h)','H.Desplaz','Tipo','Estado','Descripción'];
-  const rows=recs.map(r=>[r.fecha,r.modelo,r.serie,r.empresa,r.persona,
-    r.origen,r.destino,r.km,r.horas_maquina,r.hora_inicio,r.hora_fin,
-    r.tiempo_rep,r.horas_desplaz,r.tipo,r.estado,
-    (r.descripcion||'').replace(/"/g,'""')].map(v=>`"${v||''}"`).join(','));
+    'KM','H.Máquina','H.Inicio','H.Fin','T.Reparación(h)','H.Desplaz','Tipo','Estado','Descripción','Num.Sesiones','Detalle Sesiones'];
+  const rows=recs.map(r=>{
+    const sesiones=r.sesiones||[];
+    const detalleSes=sesiones.map(s=>`${formatFecha(s.fecha)} ${s.inicio}-${s.fin}(${s.duracion})${s.nota?':'+s.nota:''}`).join(' | ');
+    return [r.fecha,r.modelo,r.serie,r.empresa,r.persona,
+      r.origen,r.destino,r.km,r.horas_maquina,r.hora_inicio,r.hora_fin,
+      r.tiempo_rep,r.horas_desplaz,r.tipo,r.estado,
+      (r.descripcion||'').replace(/"/g,'""'),
+      sesiones.length,
+      detalleSes.replace(/"/g,'""')
+    ].map(v=>`"${v||''}"`).join(',');
+  });
   const csv='\uFEFF'+[heads.join(','),...rows].join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
@@ -884,16 +1156,6 @@ function listenField(fieldId){
   r.onend=()=>{if(btn)btn.classList.remove('listening');}
   r.start();
 }
-async function toggleFacturada(id, current){
-  const r = window._records.find(x=>x._id===id);
-  if(!r) return;
-  r.facturada = !current;
-  await window.saveRecordDB({...r});
-  closeModal('modalDetalle');
-  showToast(r.facturada ? '✅ Marcada como facturada' : '↩ Desmarcada', 'info');
-  renderList();
-}
-
 function listenRecambio(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){showToast('Voz no disponible','error');return;}
@@ -922,7 +1184,6 @@ function listenRecambio(){
   r.onend=()=>{btn.classList.remove('listening');btn.textContent='🎤';}
   r.start();
 }
-
 function listenCommand(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){showToast('Voz no disponible en este navegador','error');return;}
@@ -944,7 +1205,6 @@ function listenCommand(){
   r.start();
 }
 
-// expose for cross-script access
 window.renderList = renderList;
 window.renderResumen = renderResumen;
 
@@ -991,11 +1251,16 @@ function renderRecambios(){
 
 renderRecambios();
 
+// ── MODALES ────────────────────────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.modal-overlay').forEach(m=>{
   m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
 });
+
+// Eventos para preview de duración en modal sesión
+document.getElementById('s_inicio').addEventListener('input', previewDuracion);
+document.getElementById('s_fin').addEventListener('input', previewDuracion);
 
 // ── TOAST ──────────────────────────────────────────────────────────────────
 let toastTimer=null;

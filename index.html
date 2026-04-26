@@ -82,6 +82,7 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
 .rec-modelo{font-weight:700;font-size:15px;color:var(--white);}
 .rec-fecha{font-size:12px;color:var(--gray);}
 .rec-empresa{font-size:13px;color:var(--light);margin-top:4px;}
+.rec-serie{font-size:12px;color:var(--blue);font-weight:700;margin-top:3px;letter-spacing:.3px;}
 .rec-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
 .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;letter-spacing:.3px;}
 .tag-green{background:rgba(39,174,96,.15);color:var(--green);}
@@ -698,8 +699,10 @@ function renderList(){
   document.getElementById('recList').innerHTML=all.map(r=>`
     <div class="rec-card" onclick="openDetail('${r._id}')">
       <div class="rec-top">
-        <div><div class="rec-modelo">${r.modelo||'Sin modelo'}</div>
+        <div>
+          <div class="rec-modelo">${r.modelo||'Sin modelo'}</div>
           <div class="rec-empresa">${r.empresa||''} ${r.persona?'· '+r.persona:''}</div>
+          ${r.serie?`<div class="rec-serie">🔢 S/N: ${r.serie}</div>`:''}
         </div>
         <div style="text-align:right;">
           <div class="rec-fecha">${r.fecha||''}</div>
@@ -709,7 +712,6 @@ function renderList(){
       <div class="rec-tags">
         <span class="tag ${stateClass(r.estado)}">${r.estado||'—'}</span>
         <span class="tag tag-gray">${r.tipo||'—'}</span>
-        ${r.serie?`<span class="tag tag-blue">${r.serie}</span>`:''}
         ${r.recambios&&r.recambios.length?`<span class="tag tag-blue">🔩 ${r.recambios.reduce((a,x)=>a+x.qty,0)} piezas</span>`:''}
       </div>
       <div class="rec-stats">
@@ -900,7 +902,6 @@ function listenRecambio(){
   btn.classList.add('listening'); btn.textContent='🔴';
   r.onresult=e=>{
     const text=e.results[0][0].transcript.trim();
-    // Intentar extraer cantidad si se dice "2 filtros" o "filtro 3"
     const numMatch=text.match(/^(\d+)\s+(.+)$|^(.+?)\s+(\d+)$/);
     if(numMatch){
       if(numMatch[1]){
@@ -948,13 +949,12 @@ window.renderList = renderList;
 window.renderResumen = renderResumen;
 
 // ── RECAMBIOS ──────────────────────────────────────────────────────────────
-let recambios = []; // [{ref, qty}]
+let recambios = [];
 
 function addRecambio(){
   const ref = document.getElementById('rc_ref').value.trim();
   const qty = parseInt(document.getElementById('rc_qty').value)||1;
   if(!ref){ showToast('Escribe una referencia','error'); return; }
-  // Si ya existe la referencia, sumar cantidad
   const existing = recambios.find(r=>r.ref.toLowerCase()===ref.toLowerCase());
   if(existing){ existing.qty += qty; }
   else { recambios.push({ref, qty}); }
@@ -989,7 +989,6 @@ function renderRecambios(){
   totDiv.style.display='block';
 }
 
-// Inicializar lista vacía
 renderRecambios();
 
 function openModal(id){document.getElementById(id).classList.add('open');}

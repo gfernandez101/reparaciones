@@ -196,6 +196,10 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
       <span class="hl" style="text-align:right;">🕐 Hora fin</span>
       <span class="hv" id="displayHoraFin">--:--</span>
     </div>
+    <div style="margin-top:10px;background:var(--input);border-radius:8px;padding:10px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;color:var(--gray);">📅 Horas trabajadas hoy</span>
+      <span style="font-size:18px;font-weight:700;color:var(--yellow);font-family:'Barlow Condensed',sans-serif;" id="horasHoyDisplay">0h 0min</span>
+    </div>
   </div>
 
   <div class="card">
@@ -530,44 +534,94 @@ function showTab(name){
 }
 
 // ── TIMER ──────────────────────────────────────────────────────────────────
-let timerRunning=false,timerStart=null,elapsed=0,timerInterval=null;
+var timerRunning = false;
+var timerStart   = null;
+var elapsed      = 0;
+var timerInterval = null;
+var horaInicioActual = null;
+
 function toggleTimer(){
+  var btn = document.getElementById('btnTimer');
+  var disp = document.getElementById('timerDisplay');
   if(!timerRunning){
-    timerStart=Date.now()-elapsed; timerRunning=true;
-    timerInterval=setInterval(tickTimer,500);
-    document.getElementById('btnTimer').className='btn btn-yellow';
-    document.getElementById('btnTimer').innerHTML='⏸ PAUSAR';
-    document.getElementById('timerDisplay').classList.add('running');
-    document.getElementById('displayHoraInicio').textContent=
-      new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    timerStart = Date.now() - elapsed;
+    timerRunning = true;
+    horaInicioActual = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('displayHoraInicio').textContent = horaInicioActual;
+    document.getElementById('displayHoraFin').textContent = '--:--';
+    btn.className = 'btn btn-yellow';
+    btn.innerHTML = '⏸ PAUSAR';
+    disp.classList.add('running');
+    if(timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(tickTimer, 500);
   } else {
-    elapsed=Date.now()-timerStart; timerRunning=false; clearInterval(timerInterval);
-    document.getElementById('btnTimer').className='btn btn-green';
-    document.getElementById('btnTimer').innerHTML='▶ CONTINUAR';
-    document.getElementById('timerDisplay').classList.remove('running');
-    document.getElementById('displayHoraFin').textContent=
+    clearInterval(timerInterval);
+    timerInterval = null;
+    elapsed = Date.now() - timerStart;
+    timerRunning = false;
+    document.getElementById('displayHoraFin').textContent =
       new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+    btn.className = 'btn btn-green';
+    btn.innerHTML = '▶ CONTINUAR';
+    disp.classList.remove('running');
+    actualizarHorasHoy();
   }
 }
+
 function tickTimer(){
-  const t=timerRunning?(Date.now()-timerStart):elapsed;
-  const s=Math.floor(t/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
-  document.getElementById('timerDisplay').textContent=
-    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  var t = Date.now() - timerStart;
+  var s = Math.floor(t/1000);
+  var h = Math.floor(s/3600);
+  var m = Math.floor((s%3600)/60);
+  var ss = s%60;
+  document.getElementById('timerDisplay').textContent =
+    pad2(h)+':'+pad2(m)+':'+pad2(ss);
 }
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+
 function resetTimer(){
-  timerRunning=false; clearInterval(timerInterval); elapsed=0; timerStart=null;
-  document.getElementById('timerDisplay').textContent='00:00:00';
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerRunning = false;
+  elapsed = 0;
+  timerStart = null;
+  horaInicioActual = null;
+  document.getElementById('timerDisplay').textContent = '00:00:00';
   document.getElementById('timerDisplay').classList.remove('running');
-  document.getElementById('btnTimer').className='btn btn-green';
-  document.getElementById('btnTimer').innerHTML='▶ INICIAR';
-  document.getElementById('displayHoraInicio').textContent='--:--';
-  document.getElementById('displayHoraFin').textContent='--:--';
+  document.getElementById('btnTimer').className = 'btn btn-green';
+  document.getElementById('btnTimer').innerHTML = '▶ INICIAR';
+  document.getElementById('displayHoraInicio').textContent = '--:--';
+  document.getElementById('displayHoraFin').textContent = '--:--';
+  actualizarHorasHoy();
 }
+
 function getTimerHours(){
-  const t=timerRunning?(Date.now()-timerStart):elapsed;
+  var t = timerRunning ? (Date.now() - timerStart) : elapsed;
   return Math.round(t/3600000*100)/100;
 }
+
+function actualizarHorasHoy(){
+  var hoy = new Date().toISOString().slice(0,10);
+  var totalMin = 0;
+  (window._records||[]).forEach(function(r){
+    (r.sesiones||[]).forEach(function(s){
+      if(s.fecha === hoy){
+        var hi = s.inicio.split(':').map(Number);
+        var hf = s.fin.split(':').map(Number);
+        totalMin += Math.max(0,(hf[0]*60+hf[1])-(hi[0]*60+hi[1]));
+      }
+    });
+  });
+  // Sumar timer actual si tiene tiempo
+  var timerMin = Math.floor((timerRunning ? (Date.now()-timerStart) : elapsed) / 60000);
+  totalMin += timerMin;
+  var th = Math.floor(totalMin/60), tm = totalMin%60;
+  var el = document.getElementById('horasHoyDisplay');
+  if(el) el.textContent = th+'h '+tm+'min';
+}
+
+setInterval(actualizarHorasHoy, 30000);
 
 // ── AUTOCOMPLETAR ──────────────────────────────────────────────────────────
 function getSuggestions(field){
@@ -984,27 +1038,4 @@ function openDetail(id){
       ${row('🔧 Modelo',r.modelo)}${row('🔢 Serie',r.serie)}
       ${row('🏢 Empresa',r.empresa)}${row('👤 Persona',r.persona)}
       ${row('📅 Fecha',r.fecha)}${row('⏱ Tiempo total',r.tiempo_rep?r.tiempo_rep+'h':'')}
-      ${row('🕐 Inicio',r.hora_inicio)}${row('🕐 Fin',r.hora_fin)}
-      ${row('📍 Origen',r.origen)}${row('📍 Destino',r.destino)}
-      ${row('🗺 KM total',r.km?Math.round(r.km)+' km':'')}
-      ${row('⏲ H. máquina',r.horas_maquina)}${row('🚗 H. desplaz.',r.horas_desplaz)}
-      ${row('🔩 Tipo',r.tipo)}${row('✅ Estado',r.estado)}
-      ${r.descripcion?`<div style="background:var(--input);border-radius:8px;padding:12px;margin-top:4px;">
-        <div style="font-size:11px;color:var(--gray);margin-bottom:4px;">📝 DESCRIPCIÓN</div>
-        <div style="font-size:14px;color:var(--light);line-height:1.5;">${r.descripcion}</div>
-      </div>`:''}
-      ${r.recambios&&r.recambios.length?`<div style="background:var(--input);border-radius:8px;padding:12px;margin-top:4px;">
-        <div style="font-size:11px;color:var(--gray);margin-bottom:8px;">🔩 RECAMBIOS (${r.recambios.reduce((a,x)=>a+x.qty,0)} piezas)</div>
-        ${r.recambios.map(x=>`
-          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-            <span style="font-size:13px;color:var(--light);">${x.ref}</span>
-            <span style="font-size:13px;font-weight:700;color:var(--accent);">×${x.qty}</span>
-          </div>`).join('')}
-      </div>`:''}
-      ${renderSesionesHTML(r, true)}
-    </div>`;
-
-  // Botón facturar
-  const factBtn = document.createElement('button');
-  factBtn.className = r.facturada ? 'btn btn-gray' : 'btn btn-green';
-  factBtn.style.cssText = 'width:100%;margin-top:10px;padding:12px;font-size:14px;';
+      ${row('🕐 Inicio',r.hora_inicio)}${row('🕐 Fin',r.h

@@ -505,12 +505,6 @@ setSyncStatus('loading','Conectando...');
 </script>
 
 <script>
-window.onerror = function(msg, src, line, col, err){
-  document.body.insertAdjacentHTML('afterbegin',
-    '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:red;color:#fff;padding:12px;font-size:13px;font-family:monospace;">'
-    +'ERROR JS: '+msg+' (linea '+line+')'+'</div>');
-  return false;
-};
 window._records = [];
 window._routes  = {};
 window._activeTab = 'nueva';
@@ -525,8 +519,7 @@ function updateClock(){
   const n=new Date();
   document.getElementById('clock').textContent=n.toLocaleTimeString('es-ES');
 }
-setInterval(updateClock,1000); updateClock();
-document.getElementById('f_fecha').value=new Date().toLocaleDateString('es-ES');
+// init moved to bottom
 
 // ── TABS ───────────────────────────────────────────────────────────────────
 function showTab(name){
@@ -1325,7 +1318,6 @@ function renderRecambios(){
   totDiv.style.display='block';
 }
 
-renderRecambios();
 
 // ── MODALES ────────────────────────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
@@ -1349,6 +1341,17 @@ function showToast(msg,type=''){
   if(toastTimer)clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
 }
+
+// ── INIT SEGURO ────────────────────────────────────────────────────────────
+(function(){
+  try {
+    var f = document.getElementById('f_fecha');
+    if(f) f.value = new Date().toLocaleDateString('es-ES');
+  } catch(e){}
+  try { setInterval(updateClock,1000); updateClock(); } catch(e){}
+  try { renderRecambios(); } catch(e){}
+  try { actualizarHorasHoy(); } catch(e){}
+})();
 </script>
 </body>
 </html>

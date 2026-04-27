@@ -505,8 +505,12 @@ setSyncStatus('loading','Conectando...');
 </script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-
+window.onerror = function(msg, src, line, col, err){
+  document.body.insertAdjacentHTML('afterbegin',
+    '<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:red;color:#fff;padding:12px;font-size:13px;font-family:monospace;">'
+    +'ERROR JS: '+msg+' (linea '+line+')'+'</div>');
+  return false;
+};
 window._records = [];
 window._routes  = {};
 window._activeTab = 'nueva';
@@ -1037,4 +1041,314 @@ function openDetail(id){
       ${row('📅 Fecha',r.fecha)}${row('⏱ Tiempo total',r.tiempo_rep?r.tiempo_rep+'h':'')}
       ${row('🕐 Inicio',r.hora_inicio)}${row('🕐 Fin',r.hora_fin)}
       ${row('📍 Origen',r.origen)}${row('📍 Destino',r.destino)}
-      ${row('🗺
+      ${row('🗺 KM total',r.km?Math.round(r.km)+' km':'')}
+      ${row('⏲ H. máquina',r.horas_maquina)}${row('🚗 H. desplaz.',r.horas_desplaz)}
+      ${row('🔩 Tipo',r.tipo)}${row('✅ Estado',r.estado)}
+      ${r.descripcion?`<div style="background:var(--input);border-radius:8px;padding:12px;margin-top:4px;">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:4px;">📝 DESCRIPCIÓN</div>
+        <div style="font-size:14px;color:var(--light);line-height:1.5;">${r.descripcion}</div>
+      </div>`:''}
+      ${r.recambios&&r.recambios.length?`<div style="background:var(--input);border-radius:8px;padding:12px;margin-top:4px;">
+        <div style="font-size:11px;color:var(--gray);margin-bottom:8px;">🔩 RECAMBIOS (${r.recambios.reduce((a,x)=>a+x.qty,0)} piezas)</div>
+        ${r.recambios.map(x=>`
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:13px;color:var(--light);">${x.ref}</span>
+            <span style="font-size:13px;font-weight:700;color:var(--accent);">×${x.qty}</span>
+          </div>`).join('')}
+      </div>`:''}
+      ${renderSesionesHTML(r, true)}
+    </div>`;
+
+  // Botón facturar
+  const factBtn = document.createElement('button');
+  factBtn.className = r.facturada ? 'btn btn-gray' : 'btn btn-green';
+  factBtn.style.cssText = 'width:100%;margin-top:10px;padding:12px;font-size:14px;';
+  factBtn.innerHTML = r.facturada ? '↩ Marcar como NO facturada' : '✅ Marcar como FACTURADA';
+  factBtn.onclick = () => toggleFacturada(r._id, r.facturada);
+  document.getElementById('modalDetalleContent').appendChild(factBtn);
+
+  openModal('modalDetalle');
+}
+
+function row(l,v){
+  if(!v)return'';
+  return`<div style="display:flex;justify-content:space-between;align-items:center;
+    padding:8px;background:var(--input);border-radius:6px;">
+    <span style="font-size:12px;color:var(--gray);">${l}</span>
+    <span style="font-size:14px;color:var(--light);font-weight:600;">${v}</span>
+  </div>`;
+}
+function loadRecord(){
+  const r=window._records.find(x=>x._id===detailId);
+  if(!r)return;
+  selectedId=detailId;
+  document.getElementById('f_modelo').value=r.modelo||'';
+  document.getElementById('f_serie').value=r.serie||'';
+  document.getElementById('f_empresa').value=r.empresa||'';
+  document.getElementById('f_persona').value=r.persona||'';
+  document.getElementById('f_horas_maquina').value=r.horas_maquina||'';
+  document.getElementById('f_horas_desplaz').value=r.horas_desplaz||'';
+  document.getElementById('f_origen').value=r.origen||'';
+  document.getElementById('f_destino').value=r.destino||'';
+  document.getElementById('f_km_ida').value=r.km_ida||'';
+  document.getElementById('f_km_vuelta').value=r.km_vuelta||'';
+  document.getElementById('f_descripcion').value=r.descripcion||'';
+  const tipos=['Mantenimiento preventivo','Avería eléctrica','Avería hidráulica','Avería mecánica','Revisión periódica','Puesta a punto','Otro'];
+  const estados=['Completada','En curso','Pendiente piezas','Revisión pendiente'];
+  document.getElementById('f_tipo').selectedIndex=Math.max(0,tipos.indexOf(r.tipo));
+  document.getElementById('f_estado').selectedIndex=Math.max(0,estados.indexOf(r.estado));
+  recambios = r.recambios ? JSON.parse(JSON.stringify(r.recambios)) : [];
+  renderRecambios();
+  recalcKm();
+  closeModal('modalDetalle');
+  showTab('nueva');
+}
+async function deleteRecord(){
+  if(!confirm('¿Eliminar este registro?'))return;
+  await window.deleteRecordDB(detailId);
+  closeModal('modalDetalle');
+  showToast('🗑 Eliminado','info');
+}
+
+// ── FACTURADA ──────────────────────────────────────────────────────────────
+async function toggleFacturada(id, current){
+  const r = window._records.find(x=>x._id===id);
+  if(!r) return;
+  r.facturada = !current;
+  await window.saveRecordDB({...r});
+  closeModal('modalDetalle');
+  showToast(r.facturada ? '✅ Marcada como facturada' : '↩ Desmarcada', 'info');
+  renderList();
+}
+
+// ── RESUMEN ────────────────────────────────────────────────────────────────
+function renderResumen(){
+  const recs=window._records;
+  if(!recs.length){
+    document.getElementById('resumenContent').innerHTML=`
+      <div class="empty"><div class="ei">📊</div><p>Aún no hay registros.</p></div>`;return;
+  }
+  const totalH=recs.reduce((a,r)=>a+parseFloat(r.tiempo_rep||0),0);
+  const totalKm=recs.reduce((a,r)=>a+parseFloat(r.km||0),0);
+  const enCurso=recs.filter(r=>r.estado==='En curso');
+  const estados={},tipos={};
+  recs.forEach(r=>{
+    const s=r.estado||'Sin estado'; estados[s]=(estados[s]||0)+1;
+    const t=r.tipo||'Otro'; tipos[t]=(tipos[t]||0)+1;
+  });
+  let enCursoHTML='';
+  if(enCurso.length){
+    enCursoHTML=`<div class="card"><div class="card-title">🔄 Reparaciones en curso (${enCurso.length})</div>
+      ${enCurso.map(r=>{
+        const sesiones=r.sesiones||[];
+        const numSes=sesiones.length;
+        return `<div style="background:var(--input);border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--white);">${r.modelo||'Sin modelo'}</div>
+            <div style="font-size:12px;color:var(--gray);">${r.empresa||''} · ${r.fecha||''}</div>
+            ${numSes>0?`<div style="font-size:11px;color:var(--yellow);margin-top:2px;">📅 ${numSes} sesión${numSes>1?'es':''} · ${r.tiempo_rep||0}h acum.</div>`:'<div style="font-size:11px;color:var(--gray);margin-top:2px;">Sin sesiones</div>'}
+          </div>
+          <button class="btn-sesion" onclick="showTab('historial');setTimeout(()=>abrirModalSesion('${r._id}',null),300)">➕ Sesión</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  document.getElementById('resumenContent').innerHTML=`
+    <div class="card"><div class="card-title">📊 Totales globales</div>
+      <div class="stats-bar">
+        <div class="stat-item"><div class="sv">${recs.length}</div><div class="sl">Registros</div></div>
+        <div class="stat-item"><div class="sv">${totalH.toFixed(1)}h</div><div class="sl">Horas rep.</div></div>
+        <div class="stat-item"><div class="sv">${Math.round(totalKm)}</div><div class="sl">KM totales</div></div>
+      </div>
+    </div>
+    ${enCursoHTML}
+    <div class="card"><div class="card-title">✅ Por estado</div>
+      ${Object.entries(estados).map(([s,n])=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:10px;background:var(--input);border-radius:8px;margin-bottom:6px;">
+          <span class="tag ${stateClass(s)}">${s}</span>
+          <span style="font-size:20px;font-weight:700;color:var(--accent);">${n}</span>
+        </div>`).join('')}
+    </div>
+    <div class="card"><div class="card-title">🔩 Por tipo de reparación</div>
+      ${Object.entries(tipos).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;
+          padding:10px;background:var(--input);border-radius:8px;margin-bottom:6px;">
+          <span style="font-size:13px;color:var(--light);">${t}</span>
+          <span style="font-size:18px;font-weight:700;color:var(--accent);">${n}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ── EXPORTAR CSV ───────────────────────────────────────────────────────────
+function exportCSV(){
+  const recs=window._records;
+  if(!recs.length){showToast('No hay datos','error');return;}
+  const heads=['Fecha','Modelo','Serie','Empresa','Persona','Origen','Destino',
+    'KM','H.Máquina','H.Inicio','H.Fin','T.Reparación(h)','H.Desplaz','Tipo','Estado','Descripción','Num.Sesiones','Detalle Sesiones'];
+  const rows=recs.map(r=>{
+    const sesiones=r.sesiones||[];
+    const detalleSes=sesiones.map(s=>`${formatFecha(s.fecha)} ${s.inicio}-${s.fin}(${s.duracion})${s.nota?':'+s.nota:''}`).join(' | ');
+    return [r.fecha,r.modelo,r.serie,r.empresa,r.persona,
+      r.origen,r.destino,r.km,r.horas_maquina,r.hora_inicio,r.hora_fin,
+      r.tiempo_rep,r.horas_desplaz,r.tipo,r.estado,
+      (r.descripcion||'').replace(/"/g,'""'),
+      sesiones.length,
+      detalleSes.replace(/"/g,'""')
+    ].map(v=>`"${v||''}"`).join(',');
+  });
+  const csv='\uFEFF'+[heads.join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`Reparaciones_${new Date().toLocaleDateString('es-ES').replace(/\//g,'-')}.csv`;
+  a.click();URL.revokeObjectURL(url);
+  showToast('📥 CSV descargado');
+}
+
+// ── VOZ ────────────────────────────────────────────────────────────────────
+function setVoiceStatus(txt,color='var(--light)'){
+  const el=document.getElementById('voiceTxt');
+  el.textContent=txt;el.style.color=color;
+}
+function listenField(fieldId){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){showToast('Voz no disponible en este navegador','error');return;}
+  const r=new SR();r.lang='es-ES';r.continuous=false;r.interimResults=false;
+  const btn=document.querySelector(`.mic-btn[onclick="listenField('${fieldId}')"]`);
+  if(btn)btn.classList.add('listening');
+  setVoiceStatus('🔴 Escuchando...','var(--red)');
+  r.onresult=e=>{
+    const text=e.results[0][0].transcript;
+    const el=document.getElementById(fieldId);
+    if(el.tagName==='TEXTAREA'){el.value=(el.value+' '+text).trim();}
+    else el.value=text;
+    if(fieldId==='f_origen'||fieldId==='f_destino')checkRoute();
+    setVoiceStatus(`✅ "${text}"`,'var(--green)');
+    if(btn)btn.classList.remove('listening');
+    showToast(`🎤 ${text}`,'info');
+  };
+  r.onerror=()=>{setVoiceStatus('No se entendió','var(--yellow)');if(btn)btn.classList.remove('listening');};
+  r.onend=()=>{if(btn)btn.classList.remove('listening');}
+  r.start();
+}
+function listenRecambio(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){showToast('Voz no disponible','error');return;}
+  const r=new SR();r.lang='es-ES';r.continuous=false;r.interimResults=false;
+  const btn=document.getElementById('btnMicRc');
+  btn.classList.add('listening'); btn.textContent='🔴';
+  r.onresult=e=>{
+    const text=e.results[0][0].transcript.trim();
+    const numMatch=text.match(/^(\d+)\s+(.+)$|^(.+?)\s+(\d+)$/);
+    if(numMatch){
+      if(numMatch[1]){
+        document.getElementById('rc_ref').value=numMatch[2];
+        document.getElementById('rc_qty').value=numMatch[1];
+      } else {
+        document.getElementById('rc_ref').value=numMatch[3];
+        document.getElementById('rc_qty').value=numMatch[4];
+      }
+    } else {
+      document.getElementById('rc_ref').value=text;
+    }
+    btn.classList.remove('listening'); btn.textContent='🎤';
+    showToast(`🎤 ${text}`,'info');
+    addRecambio();
+  };
+  r.onerror=()=>{btn.classList.remove('listening');btn.textContent='🎤';};
+  r.onend=()=>{btn.classList.remove('listening');btn.textContent='🎤';}
+  r.start();
+}
+function listenCommand(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){showToast('Voz no disponible en este navegador','error');return;}
+  const r=new SR();r.lang='es-ES';r.continuous=false;r.interimResults=false;
+  setVoiceStatus('🔴 Esperando comando...','var(--red)');
+  r.onresult=e=>{
+    const text=e.results[0][0].transcript.toLowerCase();
+    setVoiceStatus('Comando: '+text,'var(--light)');
+    if(/iniciar|empezar|start/.test(text)){if(!timerRunning)toggleTimer();}
+    else if(/pausar|parar|stop|detener/.test(text)){if(timerRunning)toggleTimer();}
+    else if(/guardar|save|grabar/.test(text)){setTimeout(saveRecord,300);}
+    else if(/limpiar|nuevo|borrar/.test(text)){clearForm();}
+    else if(/exportar|csv/.test(text)){exportCSV();}
+    else if(/calcular|km/.test(text)){calcKm();}
+    else setVoiceStatus('No reconocido: '+text,'var(--yellow)');
+  };
+  r.onerror=()=>setVoiceStatus('No se entendió','var(--yellow)');
+  r.onend=()=>{};
+  r.start();
+}
+
+window.renderList = renderList;
+window.renderResumen = renderResumen;
+
+// ── RECAMBIOS ──────────────────────────────────────────────────────────────
+let recambios = [];
+
+function addRecambio(){
+  const ref = document.getElementById('rc_ref').value.trim();
+  const qty = parseInt(document.getElementById('rc_qty').value)||1;
+  if(!ref){ showToast('Escribe una referencia','error'); return; }
+  const existing = recambios.find(r=>r.ref.toLowerCase()===ref.toLowerCase());
+  if(existing){ existing.qty += qty; }
+  else { recambios.push({ref, qty}); }
+  document.getElementById('rc_ref').value='';
+  document.getElementById('rc_qty').value='1';
+  document.getElementById('rc_ref').focus();
+  renderRecambios();
+}
+
+function removeRecambio(idx){
+  recambios.splice(idx,1);
+  renderRecambios();
+}
+
+function renderRecambios(){
+  const list = document.getElementById('recambiosList');
+  const totDiv = document.getElementById('recambiosTotales');
+  if(!recambios.length){
+    list.innerHTML='<div style="font-size:13px;color:var(--gray);padding:6px 0;">Sin recambios añadidos</div>';
+    totDiv.style.display='none';
+    return;
+  }
+  list.innerHTML = recambios.map((r,i)=>`
+    <div style="display:grid;grid-template-columns:1fr 80px 44px;gap:8px;margin-bottom:6px;align-items:center;">
+      <div style="background:var(--input);border-radius:6px;padding:8px 12px;font-size:13px;color:var(--light);">${r.ref}</div>
+      <div style="background:var(--input);border-radius:6px;padding:8px;font-size:14px;font-weight:700;color:var(--accent);text-align:center;">${r.qty}</div>
+      <button onclick="removeRecambio(${i})"
+        style="background:var(--red);border:none;border-radius:6px;color:#fff;font-size:16px;cursor:pointer;padding:8px 0;width:100%;">✕</button>
+    </div>`).join('');
+  const total = recambios.reduce((a,r)=>a+r.qty,0);
+  document.getElementById('rcTotalCount').textContent = total;
+  totDiv.style.display='block';
+}
+
+renderRecambios();
+
+// ── MODALES ────────────────────────────────────────────────────────────────
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
+});
+
+// Eventos para preview de duración en modal sesión (seguros)
+['s_inicio','s_fin'].forEach(function(id){
+  var el = document.getElementById(id);
+  if(el) el.addEventListener('input', previewDuracion);
+});
+
+// ── TOAST ──────────────────────────────────────────────────────────────────
+let toastTimer=null;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show';
+  if(type)t.classList.add(type);
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>

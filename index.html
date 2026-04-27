@@ -143,8 +143,8 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
 .horas-hoy-block{margin-top:10px;background:var(--input);border-radius:8px;padding:10px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;}
 .horas-hoy-label{font-size:12px;color:var(--gray);}
 .horas-hoy-right{display:flex;align-items:center;gap:6px;}
-.horas-hoy-input{width:72px;background:transparent;border:none;border-bottom:1.5px solid var(--accent);color:var(--yellow);font-size:18px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-align:right;outline:none;padding:2px 4px;-webkit-appearance:none;appearance:none;}
-.horas-hoy-input::placeholder{color:rgba(243,156,18,.4);}
+.horas-hoy-input{width:80px;background:rgba(232,119,34,.08);border:1.5px solid var(--accent);border-radius:8px;color:var(--yellow);font-size:20px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-align:center;outline:none;padding:6px 8px;-webkit-user-select:text;user-select:text;cursor:text;}
+.horas-hoy-input:focus{background:rgba(232,119,34,.15);border-color:var(--yellow);}
 .horas-hoy-unit{font-size:14px;font-weight:700;color:var(--yellow);font-family:'Barlow Condensed',sans-serif;}
 .horas-hoy-reset{background:none;border:none;color:var(--gray);font-size:17px;cursor:pointer;padding:0 2px;line-height:1;transition:color .15s;}
 .horas-hoy-reset:active{color:var(--accent);}
@@ -215,18 +215,18 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
       <div>
         <div class="horas-hoy-label">📅 Horas trabajadas hoy</div>
         <div style="margin-top:3px;">
-          <span class="horas-hoy-badge" id="horasBadge">Auto</span>
+          <span class="horas-hoy-badge" id="horasBadge">⚡ Auto</span>
         </div>
       </div>
       <div class="horas-hoy-right">
         <input
-          type="number"
+          type="text"
+          inputmode="decimal"
           id="horasHoyManual"
           class="horas-hoy-input"
-          min="0"
-          max="24"
-          step="0.5"
           placeholder="0"
+          autocomplete="off"
+          onfocus="onHorasManualFocus()"
           oninput="onHorasManualInput()"
           onblur="onHorasManualBlur()">
         <span class="horas-hoy-unit">h</span>
@@ -551,21 +551,40 @@ let sesionEditId = null;
 // ── HORAS HOY: CONTROL MANUAL/AUTO ────────────────────────────────────────
 window.horasManualOverride = false;
 
+function onHorasManualFocus(){
+  // Al tocar el campo, seleccionar todo el texto para facilitar edición
+  var el = document.getElementById('horasHoyManual');
+  if(el) setTimeout(function(){ el.select(); }, 50);
+}
+
 function onHorasManualInput(){
-  window.horasManualOverride = true;
+  var el = document.getElementById('horasHoyManual');
+  if(!el) return;
+  // Permitir solo números y punto/coma decimal
+  el.value = el.value.replace(/[^0-9.,]/g,'').replace(',','.');
+  window.horasManualOverride = el.value.trim() !== '';
   actualizarBadge();
 }
 
 function onHorasManualBlur(){
   var el = document.getElementById('horasHoyManual');
-  if(el && el.value === ''){
+  if(!el) return;
+  var val = parseFloat(el.value);
+  if(isNaN(val) || el.value.trim() === ''){
     window.horasManualOverride = false;
     actualizarHorasHoy();
+  } else {
+    // Normalizar formato al salir del campo
+    el.value = Math.round(val * 10) / 10;
+    window.horasManualOverride = true;
   }
+  actualizarBadge();
 }
 
 function resetHorasManual(){
   window.horasManualOverride = false;
+  var el = document.getElementById('horasHoyManual');
+  if(el) el.value = '';
   actualizarHorasHoy();
   showToast('↺ Vuelve al cálculo automático','info');
 }
@@ -685,8 +704,7 @@ function actualizarHorasHoy(){
   var el = document.getElementById('horasHoyManual');
   if(el){
     if(totalMin > 0){
-      var valor = totalMin / 60;
-      el.value = Math.round(valor * 10) / 10;
+      el.value = Math.round(totalMin / 60 * 10) / 10;
     } else {
       el.value = '';
     }
@@ -791,7 +809,8 @@ function getForm(){
   const vuelta=parseFloat(document.getElementById('f_km_vuelta').value)||0;
   // Leer horas: si hay override manual, usar ese valor; si no, el calculado
   var horasEl = document.getElementById('horasHoyManual');
-  var horasVal = horasEl && horasEl.value !== '' ? parseFloat(horasEl.value) : getTimerHours();
+  var horasVal = (horasEl && horasEl.value.trim() !== '') ? parseFloat(horasEl.value) : getTimerHours();
+  if(isNaN(horasVal)) horasVal = getTimerHours();
   return {
     fecha:document.getElementById('f_fecha').value,
     modelo:document.getElementById('f_modelo').value.trim(),
@@ -834,6 +853,8 @@ function clearForm(){
   renderRecambios();
   // Resetear horas manuales
   window.horasManualOverride = false;
+  var horasEl = document.getElementById('horasHoyManual');
+  if(horasEl) horasEl.value = '';
   actualizarHorasHoy();
   showToast('🔄 Formulario limpiado','info');
 }

@@ -505,6 +505,8 @@ setSyncStatus('loading','Conectando...');
 </script>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+
 window._records = [];
 window._routes  = {};
 window._activeTab = 'nueva';
@@ -1035,5 +1037,4 @@ function openDetail(id){
       ${row('📅 Fecha',r.fecha)}${row('⏱ Tiempo total',r.tiempo_rep?r.tiempo_rep+'h':'')}
       ${row('🕐 Inicio',r.hora_inicio)}${row('🕐 Fin',r.hora_fin)}
       ${row('📍 Origen',r.origen)}${row('📍 Destino',r.destino)}
-      ${row('🗺 KM total',r.km?Math.round(r.km)+' km':'')}
-      ${row('⏲ 
+      ${row('🗺

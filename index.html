@@ -138,6 +138,19 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
 .btn-sesion{background:rgba(243,156,18,.15);border:1px solid rgba(243,156,18,.4);color:var(--yellow);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif;transition:all .15s;display:inline-flex;align-items:center;gap:4px;margin-top:8px;}
 .btn-sesion:active{transform:scale(.95);}
 .sesion-nota{font-size:11px;color:var(--gray);font-style:italic;}
+
+/* ── HORAS HOY EDITABLE ── */
+.horas-hoy-block{margin-top:10px;background:var(--input);border-radius:8px;padding:10px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.horas-hoy-label{font-size:12px;color:var(--gray);}
+.horas-hoy-right{display:flex;align-items:center;gap:6px;}
+.horas-hoy-input{width:72px;background:transparent;border:none;border-bottom:1.5px solid var(--accent);color:var(--yellow);font-size:18px;font-weight:700;font-family:'Barlow Condensed',sans-serif;text-align:right;outline:none;padding:2px 4px;-webkit-appearance:none;appearance:none;}
+.horas-hoy-input::placeholder{color:rgba(243,156,18,.4);}
+.horas-hoy-unit{font-size:14px;font-weight:700;color:var(--yellow);font-family:'Barlow Condensed',sans-serif;}
+.horas-hoy-reset{background:none;border:none;color:var(--gray);font-size:17px;cursor:pointer;padding:0 2px;line-height:1;transition:color .15s;}
+.horas-hoy-reset:active{color:var(--accent);}
+.horas-hoy-badge{font-size:10px;padding:2px 6px;border-radius:10px;font-weight:600;}
+.badge-auto{background:rgba(39,174,96,.15);color:var(--green);}
+.badge-manual{background:rgba(232,119,34,.15);color:var(--accent);}
 </style>
 </head>
 <body>
@@ -196,9 +209,29 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
       <span class="hl" style="text-align:right;">🕐 Hora fin</span>
       <span class="hv" id="displayHoraFin">--:--</span>
     </div>
-    <div style="margin-top:10px;background:var(--input);border-radius:8px;padding:10px 14px;border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:12px;color:var(--gray);">📅 Horas trabajadas hoy</span>
-      <span style="font-size:18px;font-weight:700;color:var(--yellow);font-family:'Barlow Condensed',sans-serif;" id="horasHoyDisplay">0h 0min</span>
+
+    <!-- HORAS HOY EDITABLE -->
+    <div class="horas-hoy-block">
+      <div>
+        <div class="horas-hoy-label">📅 Horas trabajadas hoy</div>
+        <div style="margin-top:3px;">
+          <span class="horas-hoy-badge" id="horasBadge">Auto</span>
+        </div>
+      </div>
+      <div class="horas-hoy-right">
+        <input
+          type="number"
+          id="horasHoyManual"
+          class="horas-hoy-input"
+          min="0"
+          max="24"
+          step="0.5"
+          placeholder="0"
+          oninput="onHorasManualInput()"
+          onblur="onHorasManualBlur()">
+        <span class="horas-hoy-unit">h</span>
+        <button class="horas-hoy-reset" onclick="resetHorasManual()" title="Volver al cálculo automático">↺</button>
+      </div>
     </div>
   </div>
 
@@ -461,6 +494,7 @@ onSnapshot(q, snapshot => {
   document.getElementById('loadingOverlay').classList.add('hidden');
   if(window._activeTab === 'historial' && window.renderList) window.renderList();
   if(window._activeTab === 'resumen'   && window.renderResumen) window.renderResumen();
+  if(!window.horasManualOverride) actualizarHorasHoy();
 }, err => {
   setSyncStatus('err', '✕ Sin conexión');
   document.getElementById('loadingOverlay').classList.add('hidden');
@@ -511,15 +545,48 @@ window._activeTab = 'nueva';
 let selectedId = null;
 let detailId   = null;
 let pendingRoute = null;
-let sesionRepId = null; // ID del registro al que se añade sesión
-let sesionEditId = null; // ID de la sesión que se está editando (null = nueva)
+let sesionRepId = null;
+let sesionEditId = null;
+
+// ── HORAS HOY: CONTROL MANUAL/AUTO ────────────────────────────────────────
+window.horasManualOverride = false;
+
+function onHorasManualInput(){
+  window.horasManualOverride = true;
+  actualizarBadge();
+}
+
+function onHorasManualBlur(){
+  var el = document.getElementById('horasHoyManual');
+  if(el && el.value === ''){
+    window.horasManualOverride = false;
+    actualizarHorasHoy();
+  }
+}
+
+function resetHorasManual(){
+  window.horasManualOverride = false;
+  actualizarHorasHoy();
+  showToast('↺ Vuelve al cálculo automático','info');
+}
+
+function actualizarBadge(){
+  var badge = document.getElementById('horasBadge');
+  if(!badge) return;
+  if(window.horasManualOverride){
+    badge.className = 'horas-hoy-badge badge-manual';
+    badge.textContent = '✏ Manual';
+  } else {
+    badge.className = 'horas-hoy-badge badge-auto';
+    badge.textContent = '⚡ Auto';
+  }
+}
 
 // ── RELOJ ──────────────────────────────────────────────────────────────────
 function updateClock(){
   const n=new Date();
   document.getElementById('clock').textContent=n.toLocaleTimeString('es-ES');
 }
-// init moved to bottom
 
 // ── TABS ───────────────────────────────────────────────────────────────────
 function showTab(name){
@@ -563,7 +630,7 @@ function toggleTimer(){
     btn.className = 'btn btn-green';
     btn.innerHTML = '▶ CONTINUAR';
     disp.classList.remove('running');
-    actualizarHorasHoy();
+    if(!window.horasManualOverride) actualizarHorasHoy();
   }
 }
 
@@ -592,7 +659,7 @@ function resetTimer(){
   document.getElementById('btnTimer').innerHTML = '▶ INICIAR';
   document.getElementById('displayHoraInicio').textContent = '--:--';
   document.getElementById('displayHoraFin').textContent = '--:--';
-  actualizarHorasHoy();
+  if(!window.horasManualOverride) actualizarHorasHoy();
 }
 
 function getTimerHours(){
@@ -601,6 +668,7 @@ function getTimerHours(){
 }
 
 function actualizarHorasHoy(){
+  if(window.horasManualOverride) return;
   var hoy = new Date().toISOString().slice(0,10);
   var totalMin = 0;
   (window._records||[]).forEach(function(r){
@@ -612,15 +680,23 @@ function actualizarHorasHoy(){
       }
     });
   });
-  // Sumar timer actual si tiene tiempo
   var timerMin = Math.floor((timerRunning ? (Date.now()-timerStart) : elapsed) / 60000);
   totalMin += timerMin;
-  var th = Math.floor(totalMin/60), tm = totalMin%60;
-  var el = document.getElementById('horasHoyDisplay');
-  if(el) el.textContent = th+'h '+tm+'min';
+  var el = document.getElementById('horasHoyManual');
+  if(el){
+    if(totalMin > 0){
+      var valor = totalMin / 60;
+      el.value = Math.round(valor * 10) / 10;
+    } else {
+      el.value = '';
+    }
+  }
+  actualizarBadge();
 }
 
-setInterval(actualizarHorasHoy, 30000);
+setInterval(function(){
+  if(!window.horasManualOverride) actualizarHorasHoy();
+}, 30000);
 
 // ── AUTOCOMPLETAR ──────────────────────────────────────────────────────────
 function getSuggestions(field){
@@ -713,6 +789,9 @@ function saveRoute(){
 function getForm(){
   const ida=parseFloat(document.getElementById('f_km_ida').value)||0;
   const vuelta=parseFloat(document.getElementById('f_km_vuelta').value)||0;
+  // Leer horas: si hay override manual, usar ese valor; si no, el calculado
+  var horasEl = document.getElementById('horasHoyManual');
+  var horasVal = horasEl && horasEl.value !== '' ? parseFloat(horasEl.value) : getTimerHours();
   return {
     fecha:document.getElementById('f_fecha').value,
     modelo:document.getElementById('f_modelo').value.trim(),
@@ -729,7 +808,7 @@ function getForm(){
     descripcion:document.getElementById('f_descripcion').value.trim(),
     hora_inicio:document.getElementById('displayHoraInicio').textContent,
     hora_fin:document.getElementById('displayHoraFin').textContent,
-    tiempo_rep:getTimerHours(),
+    tiempo_rep: horasVal,
     recambios: recambios.length ? JSON.parse(JSON.stringify(recambios)) : [],
     ts:Date.now()
   };
@@ -753,12 +832,13 @@ function clearForm(){
   document.getElementById('kmTotal').textContent='— km';
   recambios=[];
   renderRecambios();
+  // Resetear horas manuales
+  window.horasManualOverride = false;
+  actualizarHorasHoy();
   showToast('🔄 Formulario limpiado','info');
 }
 
-// ── SESIONES DE TRABAJO (reparaciones en curso) ────────────────────────────
-
-// Calcula duración en texto a partir de "HH:MM"-"HH:MM"
+// ── SESIONES DE TRABAJO ────────────────────────────────────────────────────
 function calcDuracion(inicio, fin){
   const [hi,mi]=inicio.split(':').map(Number);
   const [hf,mf]=fin.split(':').map(Number);
@@ -768,7 +848,6 @@ function calcDuracion(inicio, fin){
   return h>0 ? `${h}h ${m>0?m+'min':''}` : `${m}min`;
 }
 
-// Abre el modal de nueva sesión (o edición si se pasa sesionData)
 function abrirModalSesion(repId, event, sesionData){
   if(event) event.stopPropagation();
   sesionRepId = repId;
@@ -778,7 +857,6 @@ function abrirModalSesion(repId, event, sesionData){
   document.getElementById('sesionRepLabel').textContent = `${r.modelo||'Sin modelo'} · ${r.serie||''}`;
 
   if(sesionData){
-    // Modo edición: rellenar con datos existentes
     document.getElementById('modalSesionTitle').textContent = '✏ Editar sesión';
     document.getElementById('btnGuardarSesion').textContent = '💾 GUARDAR CAMBIOS';
     document.getElementById('s_fecha').value = sesionData.fecha;
@@ -786,7 +864,6 @@ function abrirModalSesion(repId, event, sesionData){
     document.getElementById('s_fin').value = sesionData.fin;
     document.getElementById('s_nota').value = sesionData.nota||'';
   } else {
-    // Modo nueva sesión
     document.getElementById('modalSesionTitle').textContent = '🕐 Registrar sesión de trabajo';
     document.getElementById('btnGuardarSesion').textContent = '💾 GUARDAR SESIÓN';
     const hoy = new Date();
@@ -802,7 +879,6 @@ function abrirModalSesion(repId, event, sesionData){
   openModal('modalSesion');
 }
 
-// Preview duración: listeners añadidos al final del script
 function previewDuracion(){
   const ini = document.getElementById('s_inicio').value;
   const fin = document.getElementById('s_fin').value;
@@ -816,7 +892,6 @@ function previewDuracion(){
   }
 }
 
-// Guardar sesión en Firestore (nueva o editada)
 async function guardarSesion(){
   const fecha = document.getElementById('s_fecha').value;
   const inicio = document.getElementById('s_inicio').value;
@@ -832,20 +907,16 @@ async function guardarSesion(){
   let sesiones = r.sesiones ? [...r.sesiones] : [];
 
   if(sesionEditId){
-    // Modo edición: reemplazar la sesión existente
     sesiones = sesiones.map(s => s.id===sesionEditId
       ? {...s, fecha, inicio, fin, duracion: dur, nota}
       : s
     );
   } else {
-    // Modo nueva
     sesiones.push({ id: Date.now().toString(), fecha, inicio, fin, duracion: dur, nota });
   }
 
-  // Ordenar por fecha+inicio
   sesiones.sort((a,b)=>(a.fecha+a.inicio)>(b.fecha+b.inicio)?1:-1);
 
-  // Recalcular tiempo total acumulado en horas (decimal)
   let totalMin = sesiones.reduce((acc,s)=>{
     const [hi,mi]=s.inicio.split(':').map(Number);
     const [hf,mf]=s.fin.split(':').map(Number);
@@ -859,13 +930,13 @@ async function guardarSesion(){
     closeModal('modalSesion');
     showToast(sesionEditId ? `✅ Sesión actualizada · ${dur}` : `✅ Sesión registrada · ${dur}`);
     sesionEditId = null;
+    if(!window.horasManualOverride) actualizarHorasHoy();
     if(document.getElementById('modalDetalle').classList.contains('open')){
       setTimeout(()=>openDetail(sesionRepId),400);
     }
   }
 }
 
-// Eliminar una sesión
 async function eliminarSesion(repId, sesionId, event){
   if(event) event.stopPropagation();
   if(!confirm('¿Eliminar esta sesión?')) return;
@@ -881,12 +952,12 @@ async function eliminarSesion(repId, sesionId, event){
   const updated = {...r, sesiones, tiempo_rep: tiempoTotal, _id: r._id};
   await window.saveRecordDB(updated);
   showToast('🗑 Sesión eliminada','info');
+  if(!window.horasManualOverride) actualizarHorasHoy();
   if(document.getElementById('modalDetalle').classList.contains('open')){
     setTimeout(()=>openDetail(repId),400);
   }
 }
 
-// Renderiza el bloque de sesiones en el detalle o en la tarjeta
 function renderSesionesHTML(r, enDetalle=false){
   const sesiones = r.sesiones||[];
   if(!sesiones.length && !enDetalle) return '';
@@ -900,7 +971,6 @@ function renderSesionesHTML(r, enDetalle=false){
   if(!sesiones.length){
     html += `<div style="font-size:13px;color:var(--gray);padding:4px 0;">Sin sesiones aún. Pulsa "Nueva sesión" para registrar.</div>`;
   } else {
-    // Agrupar por fecha para mostrar encabezado de día
     let lastFecha='';
     sesiones.forEach(s=>{
       const fechaFmt = formatFecha(s.fecha);
@@ -919,7 +989,6 @@ function renderSesionesHTML(r, enDetalle=false){
       </div>`;
     });
 
-    // Total acumulado
     let totalMin = sesiones.reduce((acc,s)=>{
       const [hi,mi]=s.inicio.split(':').map(Number);
       const [hf,mf]=s.fin.split(':').map(Number);
@@ -1026,7 +1095,6 @@ function openDetail(id){
   detailId=id;
   const r=window._records.find(x=>x._id===id);
   if(!r)return;
-  const enCurso = r.estado==='En curso';
   document.getElementById('modalDetalleContent').innerHTML=`
     <div style="display:grid;gap:8px;">
       ${row('🔧 Modelo',r.modelo)}${row('🔢 Serie',r.serie)}
@@ -1052,7 +1120,6 @@ function openDetail(id){
       ${renderSesionesHTML(r, true)}
     </div>`;
 
-  // Botón facturar
   const factBtn = document.createElement('button');
   factBtn.className = r.facturada ? 'btn btn-gray' : 'btn btn-green';
   factBtn.style.cssText = 'width:100%;margin-top:10px;padding:12px;font-size:14px;';
@@ -1318,7 +1385,6 @@ function renderRecambios(){
   totDiv.style.display='block';
 }
 
-
 // ── MODALES ────────────────────────────────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -1326,7 +1392,6 @@ document.querySelectorAll('.modal-overlay').forEach(m=>{
   m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
 });
 
-// Eventos para preview de duración en modal sesión (seguros)
 ['s_inicio','s_fin'].forEach(function(id){
   var el = document.getElementById(id);
   if(el) el.addEventListener('input', previewDuracion);
@@ -1342,7 +1407,7 @@ function showToast(msg,type=''){
   toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-// ── INIT SEGURO ────────────────────────────────────────────────────────────
+// ── INIT ────────────────────────────────────────────────────────────────────
 (function(){
   try {
     var f = document.getElementById('f_fecha');
@@ -1350,7 +1415,7 @@ function showToast(msg,type=''){
   } catch(e){}
   try { setInterval(updateClock,1000); updateClock(); } catch(e){}
   try { renderRecambios(); } catch(e){}
-  try { actualizarHorasHoy(); } catch(e){}
+  try { actualizarHorasHoy(); actualizarBadge(); } catch(e){}
 })();
 </script>
 </body>

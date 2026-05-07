@@ -238,7 +238,7 @@ body{background:var(--bg);color:var(--white);font-family:'Barlow',sans-serif;fon
   <div class="card">
     <div class="card-title">🔧 Datos de la máquina</div>
     <div class="field"><label>📅 FECHA</label>
-      <input type="text" id="f_fecha" readonly style="color:var(--accent);font-weight:700;">
+      <input type="text" id="f_fecha" placeholder="dd/mm/aaaa" style="color:var(--accent);font-weight:700;">
     </div>
     <div class="field ac-wrap">
       <label>🔧 MODELO DE MÁQUINA</label>
@@ -1265,13 +1265,13 @@ function renderResumen(){
 function exportCSV(){
   const recs=window._records;
   if(!recs.length){showToast('No hay datos','error');return;}
-  const heads=['Fecha','Modelo','Serie','Empresa','Persona','Origen','Destino',
-    'KM','H.Máquina','H.Inicio','H.Fin','T.Reparación(h)','H.Desplaz','Tipo','Estado','Descripción','Num.Sesiones','Detalle Sesiones'];
+  const heads=['Fecha','Modelo','Serie','Empresa',
+    'KM','H.Máquina','T.Reparación(h)','H.Desplaz','Tipo','Estado','Descripción','Num.Sesiones','Detalle Sesiones'];
   const rows=recs.map(r=>{
     const sesiones=r.sesiones||[];
     const detalleSes=sesiones.map(s=>`${formatFecha(s.fecha)} ${s.inicio}-${s.fin}(${s.duracion})${s.nota?':'+s.nota:''}`).join(' | ');
-    return [r.fecha,r.modelo,r.serie,r.empresa,r.persona,
-      r.origen,r.destino,r.km,r.horas_maquina,r.hora_inicio,r.hora_fin,
+    return [r.fecha,r.modelo,r.serie,r.empresa,
+      r.km,r.horas_maquina,
       r.tiempo_rep,r.horas_desplaz,r.tipo,r.estado,
       (r.descripcion||'').replace(/"/g,'""'),
       sesiones.length,
